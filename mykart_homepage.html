@@ -1,0 +1,36 @@
+<!doctype html><html lang="hi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>MyKart</title>
+<style>
+*{box-sizing:border-box}body{margin:0;font-family:Arial;background:#f1f3f6}.top{background:#2874f0;color:#fff;padding:10px 4%;display:flex;gap:12px;align-items:center;flex-wrap:wrap}.logo{font-size:24px;font-weight:bold}.logo small{display:block;font-size:10px;color:#ffe500}.search{display:flex;flex:1;min-width:180px}.search input{flex:1;padding:12px;border:0}.search button,.login{padding:12px;border:0;background:#fff;color:#2874f0;font-weight:bold}.cart{font-weight:bold}nav{background:#fff;padding:14px;display:flex;gap:25px;overflow:auto;justify-content:center;font-weight:bold}.banner{margin:12px auto;max-width:1400px;padding:35px 6%;color:#fff;background:#2874f0}.box{background:#fff;margin:12px auto;padding:18px;max-width:1400px}.products{display:grid;grid-template-columns:repeat(5,1fr);gap:12px}.card{border:1px solid #eee;padding:12px}.pic{height:150px;background:#f7f7f7;display:flex;align-items:center;justify-content:center;font-size:60px}.price{font-weight:bold;font-size:18px}.old{text-decoration:line-through;color:#888;font-size:12px}.add{width:100%;margin-top:10px;padding:10px;border:0;background:#ff9f00;color:white;font-weight:bold}@media(max-width:800px){.products{grid-template-columns:repeat(2,1fr)}nav{justify-content:flex-start}.top{padding:9px 12px}.search{order:3;flex-basis:100%}}
+</style></head><body>
+<header class="top"><div class="logo">MyKart<small>Shopping Made Easy</small></div><div class="search"><input id="q" placeholder="Search products..."><button onclick="go()">🔍</button></div><button class="login" onclick="alert('Login Firebase ke saath next step me connect hoga')">Login</button><div class="cart">🛒 Cart (<span id="c">0</span>)</div></header>
+<nav><span>📱 Mobiles</span><span>💻 Electronics</span><span>👕 Fashion</span><span>🏠 Home</span><span>🛒 Grocery</span><span>🎁 Offers</span></nav>
+<section class="banner"><h1>Big Shopping Deals</h1><p>Best products • Great prices • Fast delivery</p></section>
+<section class="box"><h2>Top Deals</h2><div id="products" class="products"></div></section>
+<script>
+const data=[["Smartphone",12999,15999,"📱"],["Headphones",1499,2499,"🎧"],["Smart Watch",1999,3499,"⌚"],["Running Shoes",1799,2999,"👟"],["Laptop",44999,54999,"💻"],["Backpack",899,1499,"🎒"],["Speaker",1299,1999,"🔊"],["T-Shirt",599,999,"👕"],["Coffee Maker",2499,3299,"☕"],["Camera",35999,42999,"📷"]];
+let cart=0;function render(a=data){products.innerHTML=a.map(x=>`<div class="card"><div class="pic">${x[3]}</div><h3>${x[0]}</h3><div class="price">₹${x[1].toLocaleString()} <span class="old">₹${x[2].toLocaleString()}</span></div><button class="add" onclick="add()">Add to Cart</button></div>`).join("")}function add(){c.textContent=++cart}function go(){let q=document.getElementById("q").value.toLowerCase();render(q?data.filter(x=>x[0].toLowerCase().includes(q)):data)}render();
+</script>
+<div id="auth" style="display:none;position:fixed;inset:0;background:#0008;z-index:99;align-items:center;justify-content:center">
+<div style="background:white;padding:22px;width:min(360px,90%);border-radius:8px">
+<h2 id="authTitle">Login</h2>
+<input id="email" type="email" placeholder="Email" style="width:100%;padding:11px;margin:8px 0;box-sizing:border-box">
+<input id="password" type="password" placeholder="Password" style="width:100%;padding:11px;margin:8px 0;box-sizing:border-box">
+<button onclick="doAuth()" style="width:100%;padding:11px;background:#2874f0;color:white;border:0;font-weight:bold">Continue</button>
+<button onclick="toggleMode()" id="modeBtn" style="width:100%;padding:10px;margin-top:8px;border:0">Create account</button>
+<button onclick="closeAuth()" style="width:100%;padding:10px;margin-top:5px;border:0;background:#eee">Close</button>
+<p id="msg" style="font-size:13px"></p>
+</div></div>
+
+<script type="module">
+import {initializeApp} from "https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js";
+import {getAuth,createUserWithEmailAndPassword,signInWithEmailAndPassword,signOut,onAuthStateChanged} from "https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js";
+const firebaseConfig={apiKey:"AIzaSyDGZAFtym3sjJyfmCPl8M2W6cKEghcBO80",authDomain:"flipkart-688f5.firebaseapp.com",projectId:"flipkart-688f5",storageBucket:"flipkart-688f5.firebasestorage.app",messagingSenderId:"198611064773",appId:"1:198611064773:web:10736c27d23334e5861dac",measurementId:"G-SW7G7BGG2V"};
+const auth=getAuth(initializeApp(firebaseConfig)); let signup=false;
+window.openAuth=()=>document.getElementById("auth").style.display="flex";
+window.closeAuth=()=>document.getElementById("auth").style.display="none";
+window.toggleMode=()=>{signup=!signup;authTitle.textContent=signup?"Sign Up":"Login";modeBtn.textContent=signup?"Already have an account? Login":"Create account";msg.textContent=""};
+window.doAuth=async()=>{try{let e=email.value.trim(),p=password.value;if(!e||!p){msg.textContent="Email aur password bhariye.";return} if(signup)await createUserWithEmailAndPassword(auth,e,p);else await signInWithEmailAndPassword(auth,e,p);msg.textContent="Success!";setTimeout(closeAuth,700)}catch(x){msg.textContent=x.code==="auth/invalid-credential"?"Email ya password galat hai.":x.message}};
+window.logout=()=>signOut(auth);
+onAuthStateChanged(auth,u=>{let b=document.querySelector(".login");if(u){b.textContent="Logout";b.onclick=logout}else{b.textContent="Login";b.onclick=openAuth}});
+</script>
+</body></html>
