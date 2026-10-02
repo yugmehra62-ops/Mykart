@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MyKart Admin Panel</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:Arial,sans-serif;background:#f4f6f8;color:#222}
+header{background:#2874f0;color:#fff;padding:15px 18px;display:flex;justify-content:space-between;align-items:center}
+header h2{margin:0;font-size:20px}
+.wrap{max-width:1100px;margin:auto;padding:16px}
+.card{background:#fff;border-radius:10px;padding:18px;box-shadow:0 2px 8px #0001;margin-bottom:18px}
+.login{max-width:520px;margin:55px auto}
+input,textarea,select{width:100%;padding:12px;border:1px solid #bbb;border-radius:6px;font-size:16px;margin:6px 0}
+textarea{min-height:80px}
+button{border:0;border-radius:6px;padding:11px 16px;font-size:16px;font-weight:bold;cursor:pointer}
+.primary{background:#2874f0;color:white;width:100%}
+.logout{background:white;color:#2874f0}
+.hidden{display:none}
+.msg{margin-top:12px;padding:10px;border-radius:6px;white-space:pre-wrap}
+.error{background:#ffebee;color:#b71c1c}
+.success{background:#e8f5e9;color:#1b5e20}
+.info{background:#e3f2fd;color:#0d47a1}
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.stat{font-size:28px;font-weight:bold}
+.muted{color:#666;font-size:13px}
+.formgrid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.full{grid-column:1/-1}
+.tablewrap{overflow:auto}
+table{width:100%;border-collapse:collapse}
+th,td{padding:10px;border-bottom:1px solid #eee;text-align:left;white-space:nowrap}
+.danger{background:#e53935;color:#fff}
+.small{font-size:13px}
+@media(max-width:700px){.grid,.formgrid{grid-template-columns:1fr}.full{grid-column:auto}}
+</style>
+</head>
+<body>
+<header>
+  <h2>MyKart Admin Panel</h2>
+  <button id="logoutBtn" class="logout hidden">Logout</button>
+</header>
+
+<section id="loginBox" class="wrap login">
+  <div class="card">
+    <h2>Admin Login</h2>
+    <p class="muted">Use your Firebase admin email and password.</p>
+    <input id="email" type="email" placeholder="Admin email" autocomplete="username">
+    <input id="password" type="password" placeholder="Password" autocomplete="current-password">
+    <button id="loginBtn" class="primary">Login</button>
+    <div id="loginMsg"></div>
+  </div>
+</section>
+
+<main id="adminBox" class="wrap hidden">
+  <div id="welcome" class="card"></div>
+
+  <div class="grid">
+    <div class="card"><div class="muted">Products</div><div id="productCount" class="stat">0</div></div>
+    <div class="card"><div class="muted">Orders</div><div id="orderCount" class="stat">0</div></div>
+    <div class="card"><div class="muted">Pending Orders</div><div id="pendingCount" class="stat">0</div></div>
+  </div>
+
+  <div class="card">
+    <h3>Add Product</h3>
+    <div class="formgrid">
+      <input id="pName" placeholder="Product name">
+      <input id="pPrice" type="number" min="0" placeholder="Price">
+      <input id="pOldPrice" type="number" min="0" placeholder="Old price">
+      <input id="pCategory" placeholder="Category">
+      <input id="pImage" placeholder="Image URL">
+      <input id="pStock" type="number" min="0" placeholder="Stock">
+      <textarea id="pDescription" class="full" placeholder="Description"></textarea>
+      <button id="addProductBtn" class="primary full">Add Product</button>
+    </div>
+    <div id="productMsg"></div>
+  </div>
+
+  <div class="card">
+    <h3>Products</h3>
+    <div class="tablewrap">
+      <table><thead><tr><th>Name</th><th>Price</th><th>Stock</th><th>Category</th><th>Action</th></tr></thead>
+      <tbody id="productsBody"></tbody></table>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>Orders</h3>
+    <div class="tablewrap">
+      <table><thead><tr><th>Order ID</th><th>User</th><th>Total</th><th>Status</th><th>Action</th></tr></thead>
+      <tbody id="ordersBody"></tbody></table>
+    </div>
+  </div>
+</main>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js";
+import {
+  getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged
+} from "https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js";
+import {
+  getFirestore, doc, getDoc, collection, getDocs, addDoc, deleteDoc, updateDoc
+} from "https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyDGZAFtym3sjJyfmCPl8M2W6cKEghcBO80",
+  authDomain: "flipkart-688f5.firebaseapp.com",
+  projectId: "flipkart-688f5",
+  storageBucket: "flipkart-688f5.firebasestorage.app",
+  messagingSenderId: "198611064773",
+  appId: "1:198611064773:web:10736c27d23334e5861dac",
+  measurementId: "G-SW7G7BGG2V"
+};
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+const $ = id => document.getElementById(id);
+
+function msg(id, text, type){
+  const el = $(id);
+  el.className = "msg " + type;
+  el.textContent = text;
+}
+function timeout(promise, ms=12000){
+  return Promise.race([
+    promise,
+    new Promise((_,reject)=>setTimeout(()=>reject(new Error("TIMEOUT")),ms))
+  ]);
+}
+function esc(v){
+  return String(v ?? "").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c]));
+}
+
+$("loginBtn").addEventListener("click", async ()=>{
+  const email=$("email").value.trim();
+  const password=$("password").value;
+  if(!email || !password){
+    msg("loginMsg","Email aur password dono bhariye.","error");
+    return;
+  }
+  $("loginBtn").disabled=true;
+  $("loginBtn").textContent="Checking...";
+  msg("loginMsg","Firebase login check ho raha hai...","info");
+  try{
+    const cred=await timeout(signInWithEmailAndPassword(auth,email,password),12000);
+    msg("loginMsg","Login successful. Admin permission check ho raha hai...","info");
+    await checkAdmin(cred.user);
+  }catch(e){
+    console.error(e);
+    let t="Login failed.";
+    if(e.message==="TIMEOUT") t="Firebase se response nahi aa raha (12 sec timeout). Internet/Firebase connection check karein.";
+    else if(e.code==="auth/invalid-credential" || e.code==="auth/wrong-password" || e.code==="auth/user-not-found") t="Email ya password galat hai.";
+    else if(e.code==="auth/too-many-requests") t="Bahut attempts ho gaye. Thodi der baad try karein.";
+    else t="Error: "+(e.code || e.message || "Unknown error");
+    msg("loginMsg",t,"error");
+  }finally{
+    $("loginBtn").disabled=false;
+    $("loginBtn").textContent="Login";
+  }
+});
+
+async function checkAdmin(user){
+  try{
+    const ref=doc(db,"admins",user.uid);
+    const snap=await timeout(getDoc(ref),12000);
+    if(!snap.exists()){
+      await signOut(auth);
+      throw new Error("ADMIN_DOC_MISSING");
+    }
+    const data=snap.data();
+    const role=String(data.role ?? data.Role ?? "").trim().toLowerCase();
+    if(role!=="admin"){
+      await signOut(auth);
+      throw new Error("ROLE_NOT_ADMIN:"+role);
+    }
+    $("loginBox").classList.add("hidden");
+    $("adminBox").classList.remove("hidden");
+    $("logoutBtn").classList.remove("hidden");
+    $("welcome").textContent="Admin verified: "+user.email;
+    await Promise.all([loadProducts(),loadOrders()]);
+  }catch(e){
+    console.error(e);
+    let t="Admin verification failed.";
+    if(e.message==="ADMIN_DOC_MISSING") t="Admin record nahi mila. admins collection mein UID document check karein.";
+    else if(e.message?.startsWith("ROLE_NOT_ADMIN")) t="Role Admin nahi hai. Firestore mein Role = Admin rakhein.";
+    else if(e.message==="TIMEOUT") t="Firestore se response nahi aa raha (12 sec timeout). Firestore Rules check karni hongi.";
+    else t="Admin check error: "+(e.code || e.message || "Unknown error");
+    msg("loginMsg",t,"error");
+  }
+}
+
+$("logoutBtn").addEventListener("click",()=>signOut(auth));
+
+async function loadProducts(){
+  const snap=await getDocs(collection(db,"products"));
+  $("productCount").textContent=snap.size;
+  $("productsBody").innerHTML="";
+  snap.forEach(d=>{
+    const p=d.data();
+    const tr=document.createElement("tr");
+    tr.innerHTML=`<td>${esc(p.name)}</td><td>₹${esc(p.price)}</td><td>${esc(p.stock)}</td><td>${esc(p.category)}</td><td><button class="danger small">Delete</button></td>`;
+    tr.querySelector("button").onclick=async()=>{
+      if(confirm("Delete this product?")){
+        await deleteDoc(doc(db,"products",d.id));
+        loadProducts();
+      }
+    };
+    $("productsBody").appendChild(tr);
+  });
+}
+
+$("addProductBtn").addEventListener("click",async()=>{
+  const name=$("pName").value.trim(), price=Number($("pPrice").value);
+  if(!name || !price){msg("productMsg","Product name aur price bhariye.","error");return;}
+  try{
+    await addDoc(collection(db,"products"),{
+      name, price,
+      oldPrice:Number($("pOldPrice").value)||0,
+      category:$("pCategory").value.trim(),
+      image:$("pImage").value.trim(),
+      stock:Number($("pStock").value)||0,
+      description:$("pDescription").value.trim(),
+      createdAt:new Date().toISOString()
+    });
+    msg("productMsg","Product added successfully.","success");
+    ["pName","pPrice","pOldPrice","pCategory","pImage","pStock","pDescription"].forEach(x=>$(x).value="");
+    loadProducts();
+  }catch(e){msg("productMsg","Product add error: "+(e.code||e.message),"error");}
+});
+
+async function loadOrders(){
+  const snap=await getDocs(collection(db,"orders"));
+  $("orderCount").textContent=snap.size;
+  let pending=0;
+  $("ordersBody").innerHTML="";
+  snap.forEach(d=>{
+    const o=d.data();
+    const status=String(o.status||"Pending");
+    if(status.toLowerCase()==="pending") pending++;
+    const tr=document.createElement("tr");
+    tr.innerHTML=`<td>${esc(d.id)}</td><td>${esc(o.userEmail||o.email||o.userId||"")}</td><td>₹${esc(o.total||0)}</td><td>${esc(status)}</td><td><button class="primary small">Mark Shipped</button></td>`;
+    tr.querySelector("button").onclick=async()=>{
+      await updateDoc(doc(db,"orders",d.id),{status:"Shipped"});
+      loadOrders();
+    };
+    $("ordersBody").appendChild(tr);
+  });
+  $("pendingCount").textContent=pending;
+}
+
+onAuthStateChanged(auth, async user=>{
+  if(user){
+    try{
+      await checkAdmin(user);
+    }catch(e){console.error(e);}
+  }
+});
+</script>
+</body>
+</html>
