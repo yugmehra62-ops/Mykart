@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>MyKart Admin</title>
+<style>
+body{font-family:Arial;margin:0;background:#f4f6f8;color:#222}header{background:#2874f0;color:#fff;padding:16px;display:flex;justify-content:space-between}main{max-width:1000px;margin:auto;padding:16px}.card{background:#fff;padding:16px;margin:12px 0;border-radius:10px;box-shadow:0 2px 8px #0001}input,textarea,button{width:100%;padding:11px;margin:6px 0;box-sizing:border-box}button{border:0;border-radius:6px;background:#2874f0;color:#fff;font-weight:bold}.danger{background:#e53935}.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.stat{font-size:28px;font-weight:bold}.err{color:#c62828}.ok{color:#2e7d32}#admin{display:none}#out{width:auto;background:#fff;color:#2874f0;display:none}@media(max-width:650px){.grid{grid-template-columns:1fr}}
+</style></head>
+<body><header><b>MyKart Admin Panel</b><button id="out">Logout</button></header>
+<main>
+<section id="login" class="card"><h2>Admin Login</h2><input id="email" type="email" placeholder="Admin email"><input id="pass" type="password" placeholder="Password"><button id="loginBtn">Login</button><p id="msg">Ready</p></section>
+<section id="admin">
+<p id="welcome" class="card"></p>
+<div class="grid"><div class="card">Products<div id="pc" class="stat">0</div></div><div class="card">Orders<div id="oc" class="stat">0</div></div><div class="card">Pending<div id="pending" class="stat">0</div></div></div>
+<div class="card"><h2>Add Product</h2><input id="name" placeholder="Product name"><input id="price" type="number" placeholder="Price"><input id="old" type="number" placeholder="Old price"><input id="cat" placeholder="Category"><input id="stock" type="number" placeholder="Stock"><input id="image" placeholder="Image URL"><textarea id="desc" placeholder="Description"></textarea><button id="add">Add Product</button><p id="pm"></p></div>
+<div class="card"><h2>Products</h2><div style="overflow:auto"><table style="width:100%;border-collapse:collapse"><thead><tr><th>Name</th><th>Price</th><th>Stock</th><th>Action</th></tr></thead><tbody id="products"></tbody></table></div></div>
+<div class="card"><h2>Orders</h2><div style="overflow:auto"><table style="width:100%;border-collapse:collapse"><thead><tr><th>ID</th><th>User</th><th>Total</th><th>Status</th><th>Action</th></tr></thead><tbody id="orders"></tbody></table></div></div>
+</section></main>
+<script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore-compat.js"></script>
+<script>
+const firebaseConfig={apiKey:"AIzaSyDGZAFtym3sjJyfmCPl8M2W6cKEghcBO80",authDomain:"flipkart-688f5.firebaseapp.com",projectId:"flipkart-688f5",storageBucket:"flipkart-688f5.firebasestorage.app",messagingSenderId:"198611064773",appId:"1:198611064773:web:10736c27d23334e5861dac"};
+firebase.initializeApp(firebaseConfig); const auth=firebase.auth(), db=firebase.firestore();
+const $=id=>document.getElementById(id);
+$("msg").textContent="Ready. Email aur password daalein.";
+$("loginBtn").onclick=async()=>{ $("msg").className=""; $("msg").textContent="Logging in..."; try{await auth.signInWithEmailAndPassword($("email").value.trim(),$("pass").value); }catch(e){$("msg").className="err";$("msg").textContent="Login failed: "+(e.code||e.message)} };
+$("out").onclick=()=>auth.signOut();
+async function isAdmin(u){const s=await db.collection("admins").doc(u.uid).get();return s.exists&&String(s.data().role||"").toLowerCase()=="admin"}
+function esc(x){return String(x??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c]))}
+async function products(){const s=await db.collection("products").get();$("pc").textContent=s.size;$("products").innerHTML="";s.forEach(d=>{const p=d.data(),tr=document.createElement("tr");tr.innerHTML="<td>"+esc(p.name)+"</td><td>₹"+(p.price||0)+"</td><td>"+(p.stock||0)+"</td><td><button class='danger'>Delete</button></td>";tr.querySelector("button").onclick=async()=>{if(confirm("Delete product?")){await db.collection("products").doc(d.id).delete();products()}};$("products").appendChild(tr)})}
+async function orders(){const s=await db.collection("orders").get();$("oc").textContent=s.size;let n=0;$("orders").innerHTML="";s.forEach(d=>{const o=d.data(),st=o.status||"pending";if(String(st).toLowerCase()=="pending")n++;const tr=document.createElement("tr");tr.innerHTML="<td>"+d.id+"</td><td>"+esc(o.userEmail||o.email||o.userId||"")+"</td><td>₹"+(o.total||o.amount||0)+"</td><td>"+esc(st)+"</td><td><button>Ship</button></td>";tr.querySelector("button").onclick=async()=>{await db.collection("orders").doc(d.id).update({status:"shipped"});orders()};$("orders").appendChild(tr)});$("pending").textContent=n}
+$("add").onclick=async()=>{const name=$("name").value.trim(),price=Number($("price").value);if(!name||!price){$("pm").className="err";$("pm").textContent="Name aur price bharein";return}try{await db.collection("products").add({name,price,oldPrice:Number($("old").value||0),category:$("cat").value.trim(),stock:Number($("stock").value||0),image:$("image").value.trim(),description:$("desc").value.trim(),createdAt:Date.now()});$("pm").className="ok";$("pm").textContent="Product added";["name","price","old","cat","stock","image","desc"].forEach(x=>$(x).value="");products()}catch(e){$("pm").className="err";$("pm").textContent="Product add failed: "+e.code}};
+auth.onAuthStateChanged(async u=>{if(!u){$("login").style.display="block";$("admin").style.display="none";$("out").style.display="none";return}try{if(!(await isAdmin(u))){$("msg").className="err";$("msg").textContent="This account is not an admin";await auth.signOut();return}$("login").style.display="none";$("admin").style.display="block";$("out").style.display="block";$("welcome").textContent="Admin verified: "+u.email;await products();await orders()}catch(e){$("msg").className="err";$("msg").textContent="Admin verification failed: "+e.code}});
+</script></body></html>
